@@ -53,15 +53,11 @@ class StockTracker {
     
     this.currentSymbol = this.data.default_selection.symbol;
     this.currentCountry = this.data.default_selection.country;
-    this.refreshInterval = null;
+    this.refreshTimeout = null;
     this.deferredPrompt = null;
     this.cache = new Map();
-    this.apiProxies = [
-      'https://api.allorigins.win/raw?url=',
-      'https://cors-anywhere.herokuapp.com/',
-      'https://corsproxy.io/?'
-    ];
-    this.currentProxyIndex = 0;
+    this.isOnline = navigator.onLine;
+    this.apiTimeout = 8000; // 8 second timeout
     
     this.init();
   }
@@ -71,11 +67,15 @@ class StockTracker {
     this.setupPWA();
     this.populateCountryDropdown();
     this.populateSymbolDropdown();
+    this.updateOnlineStatus();
     
-    // Wait a moment for DOM to be ready, then fetch data
+    // Start with mock data immediately to ensure app works
+    this.displayMockData();
+    
+    // Then try to fetch real data in background
     setTimeout(() => {
       this.fetchData();
-    }, 100);
+    }, 500);
     
     this.startAutoRefresh();
   }
@@ -135,15 +135,40 @@ class StockTracker {
     
     // Online/offline detection
     window.addEventListener('online', () => {
-      const indicator = document.getElementById('offlineIndicator');
-      if (indicator) indicator.classList.add('hidden');
+      console.log('Network: Back online');
+      this.isOnline = true;
+      this.updateOnlineStatus();
       this.fetchData();
     });
     
     window.addEventListener('offline', () => {
-      const indicator = document.getElementById('offlineIndicator');
-      if (indicator) indicator.classList.remove('hidden');
+      console.log('Network: Gone offline');
+      this.isOnline = false;
+      this.updateOnlineStatus();
     });
+  }
+  
+  updateOnlineStatus() {
+    const onlineStatus = document.getElementById('onlineStatus');
+    const offlineIndicator = document.getElementById('offlineIndicator');
+    
+    if (this.isOnline) {
+      if (onlineStatus) {
+        onlineStatus.classList.remove('hidden');
+        onlineStatus.textContent = '🌐 Live Data';
+      }
+      if (offlineIndicator) {
+        offlineIndicator.classList.add('hidden');
+      }
+    } else {
+      if (onlineStatus) {
+        onlineStatus.classList.add('hidden');
+      }
+      if (offlineIndicator) {
+        offlineIndicator.classList.remove('hidden');
+        offlineIndicator.textContent = '📴 Offline Mode - Showing cached data';
+      }
+    }
   }
   
   setupPWA() {
@@ -276,27 +301,42 @@ class StockTracker {
     
     console.log('Fetching data for symbol:', this.currentSymbol);
     
-    // Check cache first (unless force refresh)
-    if (!forceRefresh && this.cache.has(cacheKey)) {
+    // Check cache first if offline or not force refreshing
+    if ((!this.isOnline || !forceRefresh) && this.cache.has(cacheKey)) {
       const cached = this.cache.get(cacheKey);
-      if (now - cached.timestamp < cacheExpiry) {
+      if (!this.isOnline || (now - cached.timestamp < cacheExpiry)) {
         console.log('Using cached data for', cacheKey);
         this.displayData(cached.data);
         return;
       }
     }
     
+    // If offline and no cache, show mock data
+    if (!this.isOnline) {
+      console.log('Offline and no cache, showing mock data');
+      this.displayMockData();
+      return;
+    }
+    
     this.showLoading();
     
-    // Try multiple API approaches
-    let lastError = null;
-    
-    // First try: Direct Yahoo Finance API
     try {
+      // Try fetching real data with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), this.apiTimeout);
+      
       const directUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(this.currentSymbol)}`;
       console.log('Trying direct API:', directUrl);
       
-      const response = await fetch(directUrl);
+      const response = await fetch(directUrl, {
+        signal: controller.signal,
+        headers: {
+          'Accept': 'application/json',
+        }
+      });
+      
+      clearTimeout(timeoutId);
+      
       if (response.ok) {
         const data = await response.json();
         const stockData = await this.parseYahooData(data);
@@ -306,43 +346,11 @@ class StockTracker {
         return;
       }
     } catch (error) {
-      console.log('Direct API failed:', error.message);
-      lastError = error;
+      console.log('API fetch failed:', error.message);
     }
     
-    // Second try: Use proxy services
-    for (let i = 0; i < this.apiProxies.length; i++) {
-      try {
-        const proxy = this.apiProxies[i];
-        const apiUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(this.currentSymbol)}`;
-        const url = proxy + encodeURIComponent(apiUrl);
-        
-        console.log('Trying proxy API:', proxy);
-        
-        const response = await fetch(url, {
-          headers: {
-            'Accept': 'application/json',
-          },
-          timeout: 10000
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          const stockData = await this.parseYahooData(data);
-          this.cache.set(cacheKey, { data: stockData, timestamp: now });
-          this.displayData(stockData);
-          this.hideLoading();
-          return;
-        }
-      } catch (error) {
-        console.log(`Proxy ${this.apiProxies[i]} failed:`, error.message);
-        lastError = error;
-        continue;
-      }
-    }
-    
-    // If all methods fail, try mock data for demo
-    console.log('All API methods failed, using mock data');
+    // If API fails, fall back to mock data
+    console.log('API failed, showing mock data for demo');
     this.displayMockData();
     this.hideLoading();
   }
@@ -379,28 +387,31 @@ class StockTracker {
   }
   
   displayMockData() {
-    // Generate realistic mock data for demo purposes
-    const basePrice = this.currentCountry === 'IN' ? 24650 : 4350;
-    const mockChange = (Math.random() - 0.5) * 100;
+    // Generate realistic mock data based on current selection
+    const isIndian = this.currentCountry === 'IN';
+    const basePrice = isIndian ? 24590.50 : 4385.20;
+    const mockChange = (Math.random() - 0.5) * (isIndian ? 200 : 50);
+    const mockChangePercent = (mockChange / basePrice) * 100;
     
     const mockData = {
       symbol: this.currentSymbol,
       name: this.getDisplayName(this.currentSymbol),
-      currency: this.currentCountry === 'IN' ? 'INR' : 'USD',
+      currency: isIndian ? 'INR' : 'USD',
       currentPrice: basePrice + mockChange,
       previousClose: basePrice,
-      openPrice: basePrice + (Math.random() - 0.5) * 50,
-      dayHigh: basePrice + Math.abs(mockChange) + 50,
-      dayLow: basePrice - Math.abs(mockChange) - 50,
-      fiftyTwoWeekHigh: basePrice * 1.15,
-      fiftyTwoWeekLow: basePrice * 0.85,
-      marketState: 'CLOSED',
+      openPrice: basePrice + (Math.random() - 0.5) * (isIndian ? 100 : 25),
+      dayHigh: basePrice + Math.abs(mockChange) + (isIndian ? 150 : 35),
+      dayLow: basePrice - Math.abs(mockChange) - (isIndian ? 100 : 25),
+      fiftyTwoWeekHigh: basePrice * 1.18,
+      fiftyTwoWeekLow: basePrice * 0.82,
+      marketState: 'REGULAR', // Will be processed by getMarketStatus
       regularMarketTime: Math.floor(Date.now() / 1000),
-      timezone: this.currentCountry === 'IN' ? 'IST' : 'EST',
+      timezone: isIndian ? 'IST' : 'EST',
       change: mockChange,
-      changePercent: (mockChange / basePrice) * 100
+      changePercent: mockChangePercent
     };
     
+    console.log('Displaying mock data for demo:', mockData);
     this.displayData(mockData);
   }
   
@@ -416,6 +427,58 @@ class StockTracker {
     return found ? found.displayName : symbol;
   }
   
+  // Market status logic with proper timezone handling
+  getMarketStatus(symbol, marketState) {
+    const now = new Date();
+    const day = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    
+    // Weekend check
+    if (day === 0 || day === 6) {
+      return { status: 'Closed', class: 'closed' };
+    }
+    
+    // Check if it's an Indian symbol
+    const isIndianSymbol = symbol.includes('.NS') || symbol.startsWith('^NSEI') || symbol.startsWith('^BSESN') || symbol.includes('NSE') || symbol.includes('BSE') || symbol.startsWith('^NSEBANK') || symbol.startsWith('^NSEIT');
+    
+    if (isIndianSymbol) {
+      // Indian market hours: 9:15 AM to 3:30 PM IST
+      const istTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
+      const hours = istTime.getHours();
+      const minutes = istTime.getMinutes();
+      const currentMinutes = hours * 60 + minutes;
+      
+      const marketOpen = 9 * 60 + 15; // 9:15 AM
+      const marketClose = 15 * 60 + 30; // 3:30 PM
+      
+      if (currentMinutes >= marketOpen && currentMinutes <= marketClose) {
+        return { status: 'Open', class: 'open' };
+      } else if (currentMinutes < marketOpen) {
+        return { status: 'Pre-Market', class: 'closed' };
+      } else {
+        return { status: 'Closed', class: 'closed' };
+      }
+    } else {
+      // US market hours: 9:30 AM to 4:00 PM EST
+      const estTime = new Date(now.toLocaleString("en-US", {timeZone: "America/New_York"}));
+      const hours = estTime.getHours();
+      const minutes = estTime.getMinutes();
+      const currentMinutes = hours * 60 + minutes;
+      
+      const marketOpen = 9 * 60 + 30; // 9:30 AM EST
+      const marketClose = 16 * 60; // 4:00 PM EST
+      
+      if (currentMinutes >= marketOpen && currentMinutes <= marketClose) {
+        return { status: 'Open', class: 'open' };
+      } else if (currentMinutes < marketOpen && currentMinutes >= 4 * 60) { // 4 AM EST onwards
+        return { status: 'Pre-Market', class: 'closed' };
+      } else if (currentMinutes > marketClose && currentMinutes <= 20 * 60) { // Until 8 PM EST
+        return { status: 'After-Hours', class: 'closed' };
+      } else {
+        return { status: 'Closed', class: 'closed' };
+      }
+    }
+  }
+  
   displayData(data) {
     console.log('Displaying data:', data);
     
@@ -428,34 +491,34 @@ class StockTracker {
     // Format currency
     const currencySymbol = data.currency === 'INR' ? '₹' : '$';
     
-    // Current price
+    // Current price - using full number formatting
     const currentPriceEl = document.getElementById('currentPrice');
     if (currentPriceEl) {
-      currentPriceEl.textContent = `${currencySymbol}${this.formatNumber(data.currentPrice)}`;
+      currentPriceEl.textContent = `${currencySymbol}${this.formatNumberFull(data.currentPrice)}`;
     }
     
     // Price change
     const changeEl = document.getElementById('priceChange');
     if (changeEl) {
-      const changeText = `${data.change >= 0 ? '+' : ''}${this.formatNumber(data.change)} (${data.changePercent >= 0 ? '+' : ''}${data.changePercent.toFixed(2)}%)`;
+      const changeText = `${data.change >= 0 ? '+' : ''}${this.formatNumberFull(data.change)} (${data.changePercent >= 0 ? '+' : ''}${data.changePercent.toFixed(2)}%)`;
       changeEl.textContent = changeText;
       changeEl.className = `price-change ${data.change >= 0 ? 'positive' : 'negative'}`;
     }
     
-    // Other data points
+    // Other data points - all using full number formatting
     const openPriceEl = document.getElementById('openPrice');
     if (openPriceEl) {
-      openPriceEl.textContent = `${currencySymbol}${this.formatNumber(data.openPrice)}`;
+      openPriceEl.textContent = `${currencySymbol}${this.formatNumberFull(data.openPrice)}`;
     }
     
     const previousCloseEl = document.getElementById('previousClose');
     if (previousCloseEl) {
-      previousCloseEl.textContent = `${currencySymbol}${this.formatNumber(data.previousClose)}`;
+      previousCloseEl.textContent = `${currencySymbol}${this.formatNumberFull(data.previousClose)}`;
     }
     
     const allTimeHighEl = document.getElementById('allTimeHigh');
     if (allTimeHighEl) {
-      allTimeHighEl.textContent = `${currencySymbol}${this.formatNumber(data.fiftyTwoWeekHigh)}`;
+      allTimeHighEl.textContent = `${currencySymbol}${this.formatNumberFull(data.fiftyTwoWeekHigh)}`;
     }
     
     // Calculate correction percentage
@@ -472,12 +535,12 @@ class StockTracker {
       upsideEl.textContent = `+${upsidePercent.toFixed(2)}%`;
     }
     
-    // Market status
+    // Market status with proper timezone logic
     const statusEl = document.getElementById('marketStatus');
     if (statusEl) {
-      const isOpen = data.marketState === 'REGULAR' || data.marketState === 'PREPRE' || data.marketState === 'PRE';
-      statusEl.textContent = isOpen ? 'Open' : 'Closed';
-      statusEl.className = `data-value market-status ${isOpen ? 'open' : 'closed'}`;
+      const marketStatus = this.getMarketStatus(data.symbol, data.marketState);
+      statusEl.textContent = marketStatus.status;
+      statusEl.className = `data-value market-status ${marketStatus.class}`;
     }
     
     // Last updated
@@ -500,28 +563,23 @@ class StockTracker {
     }
   }
   
-  formatNumber(num) {
+  // FIXED: New function for full number formatting with commas
+  formatNumberFull(num) {
     if (typeof num !== 'number' || isNaN(num)) return 'N/A';
     
-    if (num >= 1e9) {
-      return (num / 1e9).toFixed(2) + 'B';
-    } else if (num >= 1e6) {
-      return (num / 1e6).toFixed(2) + 'M';
-    } else if (num >= 1e3) {
-      return (num / 1e3).toFixed(2) + 'K';
-    } else {
-      return num.toFixed(2);
-    }
+    // Use Intl.NumberFormat for proper comma formatting
+    return new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(num);
   }
   
   showLoading() {
     const loadingEl = document.getElementById('loadingContainer');
     const errorEl = document.getElementById('errorContainer');
-    const stockEl = document.getElementById('stockData');
     
     if (loadingEl) loadingEl.classList.remove('hidden');
     if (errorEl) errorEl.classList.add('hidden');
-    if (stockEl) stockEl.classList.add('hidden');
     
     // Add spinning animation to refresh button
     const refreshBtn = document.getElementById('refreshBtn');
@@ -547,19 +605,28 @@ class StockTracker {
     const errorEl = document.getElementById('errorContainer');
     const messageEl = document.getElementById('errorMessage');
     const stockEl = document.getElementById('stockData');
+    const loadingEl = document.getElementById('loadingContainer');
     
     if (errorEl) errorEl.classList.remove('hidden');
     if (messageEl) messageEl.textContent = message;
     if (stockEl) stockEl.classList.add('hidden');
+    if (loadingEl) loadingEl.classList.add('hidden');
+    
+    this.hideLoading();
   }
   
   startAutoRefresh() {
-    // Refresh every 30 seconds
-    this.refreshInterval = setInterval(() => {
-      if (navigator.onLine) {
-        this.fetchData();
-      }
-    }, 30000);
+    // Use setTimeout for better performance instead of setInterval
+    const scheduleNextRefresh = () => {
+      this.refreshTimeout = setTimeout(() => {
+        if (this.isOnline) {
+          this.fetchData();
+        }
+        scheduleNextRefresh(); // Schedule the next refresh
+      }, 30000); // 30 seconds
+    };
+    
+    scheduleNextRefresh();
   }
   
   showInstallPrompt() {
