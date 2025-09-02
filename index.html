@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Market Tracker</title>
+    
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#218083">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Stock Tracker">
+    <meta name="description" content="Track Indian and US stock market indices and stocks with real-time data">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="data:application/json;base64,ewogICJuYW1lIjogIlN0b2NrIE1hcmtldCBUcmFja2VyIiwKICAic2hvcnRfbmFtZSI6ICJTdG9jayBUcmFja2VyIiwKICAiZGVzY3JpcHRpb24iOiAiVHJhY2sgSW5kaWFuIGFuZCBVUyBzdG9jayBtYXJrZXQgaW5kaWNlcyBhbmQgc3RvY2tzIHdpdGggcmVhbC10aW1lIGRhdGEiLAogICJzdGFydF91cmwiOiAiLyIsCiAgImRpc3BsYXkiOiAic3RhbmRhbG9uZSIsCiAgImJhY2tncm91bmRfY29sb3IiOiAiI2ZjZmNmOSIsCiAgInRoZW1lX2NvbG9yIjogIiMyMTgwODMiLAogICJpY29ucyI6IFsKICAgIHsKICAgICAgInNyYyI6ICJkYXRhOmltYWdlL3N2Zyt4bWwsJTNDc3ZnIHhtbG5zPSdodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2Zycgdmlld0JveD0nMCAwIDUxMiA1MTInJTNFJTNDcmVjdCB3aWR0aD0nNTEyJyBoZWlnaHQ9JzUxMicgZmlsbD0nJTIzMjE4MDgzJy8lM0UlM0N0ZXh0IHg9JzI1NicgeT0nMjgwJyBmb250LXNpemU9JzI0MCcgZmlsbD0nd2hpdGUnIHRleHQtYW5jaG9yPSdtaWRkbGUnIGZvbnQtZmFtaWx5PSdBcmlhbCclM0UkJTNDL3RleHQlM0UlM0Mvc3ZnJTNFIiwKICAgICAgInNpemVzIjogIjUxMng1MTIiLAogICAgICAidHlwZSI6ICJpbWFnZS9zdmcreG1sIgogICAgfQogIF0KfQ==">
+    
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23218083'/><text x='50' y='60' font-size='40' fill='white' text-anchor='middle' font-family='Arial'>$</text></svg>">
+    
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header__content">
+                <h1 class="header__title">📊 Stock Market Tracker</h1>
+                <button class="btn btn--outline refresh-btn" id="refreshBtn" title="Refresh Data">
+                    <span class="refresh-icon">🔄</span>
+                    <span class="refresh-text">Refresh</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Controls -->
+        <div class="controls">
+            <div class="form-group">
+                <label class="form-label" for="countrySelect">Select Country</label>
+                <select class="form-control" id="countrySelect">
+                    <option value="IN">🇮🇳 India</option>
+                    <option value="US">🇺🇸 United States</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" for="symbolSelect">Select Index/Stock</label>
+                <select class="form-control" id="symbolSelect">
+                    <option value="">Loading...</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div class="loading-container hidden" id="loadingContainer">
+            <div class="loading-spinner"></div>
+            <p>Fetching market data...</p>
+        </div>
+
+        <!-- Error State -->
+        <div class="error-container hidden" id="errorContainer">
+            <div class="error-card">
+                <h3>⚠️ Error Loading Data</h3>
+                <p id="errorMessage">Unable to fetch market data. Please check your connection and try again.</p>
+                <button class="btn btn--primary" onclick="window.app.fetchData()">Retry</button>
+            </div>
+        </div>
+
+        <!-- Stock Data Display -->
+        <div class="stock-data hidden" id="stockData">
+            <!-- Stock Header -->
+            <div class="stock-header">
+                <div class="stock-info">
+                    <h2 class="stock-name" id="stockName">-</h2>
+                    <p class="stock-symbol" id="stockSymbol">-</p>
+                </div>
+                <div class="current-price">
+                    <span class="price-value" id="currentPrice">-</span>
+                    <span class="price-change" id="priceChange">-</span>
+                </div>
+            </div>
+
+            <!-- Market Data Cards -->
+            <div class="data-grid">
+                <div class="data-card">
+                    <h3 class="data-label">Open Price</h3>
+                    <p class="data-value" id="openPrice">-</p>
+                </div>
+                
+                <div class="data-card">
+                    <h3 class="data-label">Previous Close</h3>
+                    <p class="data-value" id="previousClose">-</p>
+                </div>
+                
+                <div class="data-card highlight">
+                    <h3 class="data-label">All Time High</h3>
+                    <p class="data-value" id="allTimeHigh">-</p>
+                </div>
+                
+                <div class="data-card correction">
+                    <h3 class="data-label">Correction from ATH</h3>
+                    <p class="data-value correction-value" id="correctionPercent">-</p>
+                </div>
+                
+                <div class="data-card upside">
+                    <h3 class="data-label">Upside to ATH</h3>
+                    <p class="data-value upside-value" id="upsidePercent">-</p>
+                </div>
+                
+                <div class="data-card">
+                    <h3 class="data-label">Market Status</h3>
+                    <p class="data-value market-status" id="marketStatus">-</p>
+                </div>
+            </div>
+
+            <!-- Last Updated -->
+            <div class="last-updated">
+                <small>Last updated: <span id="lastUpdated">-</span></small>
+            </div>
+        </div>
+
+        <!-- Install Prompt -->
+        <div class="install-prompt hidden" id="installPrompt">
+            <div class="install-card">
+                <h3>📱 Install App</h3>
+                <p>Install this app on your device for quick access to market data!</p>
+                <div class="install-buttons">
+                    <button class="btn btn--primary" id="installBtn">Install</button>
+                    <button class="btn btn--outline" id="dismissInstall">Not Now</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>Data provided by Yahoo Finance • Auto-refreshes every 30 seconds</p>
+            <p class="offline-indicator hidden" id="offlineIndicator">📴 Offline Mode - Showing cached data</p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
