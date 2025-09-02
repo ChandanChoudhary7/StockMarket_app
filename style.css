@@ -792,28 +792,39 @@ select.form-control {
   }
 }
 
-/* Fix for dropdown functionality - Override design system select styles */
+/* FIXED: Dropdown functionality - Simplified and functional select styles */
 select.form-control {
-  padding: var(--space-8) var(--space-32) var(--space-8) var(--space-12);
-  -webkit-appearance: menulist;
-  -moz-appearance: menulist;
-  appearance: menulist;
-  background-image: none;
-  background-color: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-base);
+  width: 100%;
+  padding: var(--space-10) var(--space-12);
   font-size: var(--font-size-md);
   line-height: 1.5;
   color: var(--color-text);
+  background-color: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-base);
   cursor: pointer;
-  position: relative;
-  z-index: 1;
+  
+  /* Reset appearance for cross-browser compatibility */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  
+  /* Custom dropdown arrow */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23626C7C' d='M6 8L2 4h8z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right var(--space-12) center;
+  background-size: 12px;
+  padding-right: var(--space-32);
+}
+
+select.form-control:hover {
+  border-color: var(--color-primary);
 }
 
 select.form-control:focus {
   border-color: var(--color-primary);
-  outline: var(--focus-outline);
-  box-shadow: var(--focus-ring);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(var(--color-teal-500-rgb), 0.2);
 }
 
 select.form-control option {
@@ -827,6 +838,7 @@ select.form-control optgroup {
   color: var(--color-text);
   font-weight: var(--font-weight-medium);
   font-size: var(--font-size-sm);
+  padding: var(--space-4) 0;
 }
 
 /* Loading State */
@@ -927,6 +939,8 @@ select.form-control optgroup {
   font-weight: var(--font-weight-bold);
   display: block;
   color: var(--color-text);
+  word-break: break-word;
+  line-height: 1.2;
 }
 
 .price-change {
@@ -997,6 +1011,8 @@ select.form-control optgroup {
   color: var(--color-text);
   margin: 0;
   font-family: var(--font-family-mono);
+  letter-spacing: 0.025em;
+  word-spacing: 0.1em;
 }
 
 .correction-value {
@@ -1007,24 +1023,31 @@ select.form-control optgroup {
   color: var(--color-success);
 }
 
+/* FIXED: Market Status - Improved visibility and styling */
 .market-status {
-  padding: var(--space-4) var(--space-8);
+  padding: var(--space-8) var(--space-16);
   border-radius: var(--radius-full);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
   display: inline-block;
+  min-width: 100px;
+  text-align: center;
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: all var(--duration-normal) var(--ease-standard);
 }
 
 .market-status.open {
-  background: rgba(var(--color-success-rgb), 0.15);
+  background: rgba(var(--color-success-rgb), 0.2);
   color: var(--color-success);
-  border: 1px solid rgba(var(--color-success-rgb), 0.25);
+  border: 2px solid var(--color-success);
 }
 
 .market-status.closed {
-  background: rgba(var(--color-error-rgb), 0.15);
+  background: rgba(var(--color-error-rgb), 0.2);
   color: var(--color-error);
-  border: 1px solid rgba(var(--color-error-rgb), 0.25);
+  border: 2px solid var(--color-error);
 }
 
 /* Last Updated */
@@ -1107,6 +1130,18 @@ select.form-control optgroup {
   margin: var(--space-4) 0;
 }
 
+/* Online Status Indicators */
+.online-status {
+  background: var(--color-bg-3);
+  color: var(--color-success);
+  padding: var(--space-8) var(--space-16);
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(var(--color-success-rgb), 0.3);
+  display: inline-block;
+  margin-top: var(--space-8);
+  font-weight: var(--font-weight-medium);
+}
+
 .offline-indicator {
   background: var(--color-bg-6);
   color: var(--color-warning);
@@ -1115,6 +1150,7 @@ select.form-control optgroup {
   border: 1px solid rgba(var(--color-warning-rgb), 0.3);
   display: inline-block;
   margin-top: var(--space-8);
+  font-weight: var(--font-weight-medium);
 }
 
 /* Responsive Design */
@@ -1142,7 +1178,12 @@ select.form-control optgroup {
   }
   
   .price-value {
-    font-size: var(--font-size-3xl);
+    font-size: var(--font-size-2xl);
+    line-height: 1.1;
+  }
+  
+  .data-value {
+    font-size: var(--font-size-md);
   }
 }
 
@@ -1183,11 +1224,17 @@ select.form-control optgroup {
 
 /* Focus states for keyboard navigation */
 .form-control:focus {
-  box-shadow: var(--focus-ring);
+  box-shadow: 0 0 0 3px rgba(var(--color-teal-500-rgb), 0.2);
 }
 
 .btn:focus-visible {
   box-shadow: var(--focus-ring);
+}
+
+button:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 /* Print styles */
@@ -1208,6 +1255,7 @@ select.form-control optgroup {
     background-color: var(--color-surface);
     border-color: var(--color-border);
     color: var(--color-text);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23A7A9A9' d='M6 8L2 4h8z'/%3E%3C/svg%3E");
   }
   
   select.form-control option {
@@ -1225,6 +1273,7 @@ select.form-control optgroup {
   background-color: var(--color-surface);
   border-color: var(--color-border);
   color: var(--color-text);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23A7A9A9' d='M6 8L2 4h8z'/%3E%3C/svg%3E");
 }
 
 [data-color-scheme="dark"] select.form-control option {
