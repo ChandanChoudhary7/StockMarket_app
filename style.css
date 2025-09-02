@@ -792,7 +792,7 @@ select.form-control {
   }
 }
 
-/* FIXED: Dropdown functionality - Simplified and functional select styles */
+/* Dropdown functionality - Simplified and functional select styles */
 select.form-control {
   width: 100%;
   padding: var(--space-10) var(--space-12);
@@ -1023,7 +1023,7 @@ select.form-control optgroup {
   color: var(--color-success);
 }
 
-/* FIXED: Market Status - Improved visibility and styling */
+/* Market Status - Improved visibility and styling */
 .market-status {
   padding: var(--space-8) var(--space-16);
   border-radius: var(--radius-full);
